@@ -1,7 +1,7 @@
 import json, os, smtplib, urllib.request, xml.etree.ElementTree as ET
 from email.message import EmailMessage
 
-HANDLE = "doggiedasher"
+HANDLE = "LofiGirl"
 API_KEY = os.environ["YT_API_KEY"]
 GMAIL = os.environ["GMAIL_ADDRESS"]
 GMAIL_PASS = os.environ["GMAIL_APP_PASSWORD"]
