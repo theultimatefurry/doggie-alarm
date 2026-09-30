@@ -1,4 +1,4 @@
-import json, os, smtplib, urllib.request, xml.etree.ElementTree as ET
+import json, os, smtplib, time, urllib.request, xml.etree.ElementTree as ET
 from email.message import EmailMessage
 
 HANDLE = "doggiedasher"
@@ -9,23 +9,29 @@ SEND_TO = os.environ["ICLOUD_ADDRESS"]
 STATE_FILE = "last_alert.txt"
 
 
-def get_json(url):
-    with urllib.request.urlopen(url) as r:
-        return json.load(r)
+def fetch(url):
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(url, timeout=20) as r:
+                return r.read()
+        except Exception as e:
+            print(f"Connection problem (try {attempt + 1}/3): {e}")
+            time.sleep(5)
+    print("YouTube couldn't be reached. Will try again next check.")
+    raise SystemExit(0)
 
 
 # 1. Find the channel ID from the @handle
-ch = get_json(f"https://www.googleapis.com/youtube/v3/channels?part=id&forHandle={HANDLE}&key={API_KEY}")
+ch = json.loads(fetch(f"https://www.googleapis.com/youtube/v3/channels?part=id&forHandle={HANDLE}&key={API_KEY}"))
 channel_id = ch["items"][0]["id"]
 
-# 2. Get recent video IDs from the channel's free RSS feed
-with urllib.request.urlopen(f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}") as r:
-    feed = ET.fromstring(r.read())
+# 2. Get recent video IDs from the channel's RSS feed
+feed = ET.fromstring(fetch(f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"))
 ns = {"yt": "http://www.youtube.com/xml/schemas/2015"}
 ids = [e.text for e in feed.findall(".//yt:videoId", ns)][:15]
 
-# 3. Ask YouTube which of them (if any) is live right now
-vids = get_json(f"https://www.googleapis.com/youtube/v3/videos?part=snippet&id={','.join(ids)}&key={API_KEY}")
+# 3. Check which of them (if any) is live right now
+vids = json.loads(fetch(f"https://www.googleapis.com/youtube/v3/videos?part=snippet&id={','.join(ids)}&key={API_KEY}"))
 live = [v for v in vids["items"] if v["snippet"]["liveBroadcastContent"] == "live"]
 
 if not live:
